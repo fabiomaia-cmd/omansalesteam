@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071d2b">
+  <meta name="description" content="Coleta de preços de supermercado e inteligência de mercado">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <title>PriceScope | Coleta de preços</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">P</span><div><strong>PriceScope</strong><small>Inteligência de mercado</small></div></div>
+    <div class="top-actions"><button class="icon-button" id="installBtn" hidden>＋ Instalar</button><button class="icon-button" id="exportBtn">⇩ Exportar</button><label class="icon-button file-label">⇧ Importar<input id="importInput" type="file" accept=".csv,text/csv"></label></div>
+  </header>
+  <main class="shell">
+    <section class="hero"><div><p class="eyebrow">COLETA DE PREÇOS</p><h1>Veja o mercado com clareza.</h1><p class="hero-copy">Registre preços no campo, compare por categoria e estime o preço de venda ao varejista.</p></div><div class="hero-stat"><span id="recordCount">0</span><small>registros salvos</small></div></section>
+    <section class="quick-actions">
+      <button class="action-card primary" id="manualBtn"><span class="action-icon">＋</span><span><b>Nova coleta</b><small>Preenchimento manual</small></span></button>
+      <button class="action-card" id="photoBtn"><span class="action-icon">▣</span><span><b>Ler foto</b><small>Reconhecer etiqueta ou nota</small></span></button>
+      <button class="action-card" id="audioBtn"><span class="action-icon">◉</span><span><b>Transcrever áudio</b><small>Fale os dados da coleta</small></span></button>
+      <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
+    </section>
+    <section class="panel filters-panel">
+      <div class="panel-heading"><div><p class="eyebrow">VISÃO GERAL</p><h2>Filtros de pesquisa</h2></div><button id="clearFilters" class="text-button">Limpar filtros</button></div>
+      <div class="filters">
+        <label>Período da coleta<input id="filterFrom" type="date"></label><label class="date-to">até<input id="filterTo" type="date"></label>
+        <label>País<select id="filterCountry"><option value="">Todos os países</option></select></label>
+        <label>Estabelecimento<select id="filterStore"><option value="">Todos os estabelecimentos</option></select></label>
+        <label>Proteína<select id="filterProtein"><option value="">Todas</option><option>Frango</option><option>Bovino</option><option>Carneiro</option><option>Goat</option></select></label>
+        <label>Temperatura<select id="filterTemp"><option value="">Todas</option><option>Congelado</option><option>Resfriado</option></select></label>
+        <label>Produto<select id="filterProduct"><option value="">Todos</option></select></label>
+      </div>
+    </section>
+    <section class="dashboard-grid">
+      <div class="panel table-panel"><div class="panel-heading"><div><p class="eyebrow">BASE DE DADOS</p><h2>Preços coletados <span id="visibleCount" class="count-pill">0</span></h2></div><button id="deleteSelected" class="text-button danger">Excluir selecionados</button></div>
+        <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="selectAll"></th><th>Data</th><th>Estabelecimento</th><th>Produto</th><th>Temp.</th><th>Embalagem</th><th>Preço/kg</th><th>RSP consumidor</th><th>Venda estimada</th><th></th></tr></thead><tbody id="priceTable"></tbody></table><div id="emptyState" class="empty-state"><div>◌</div><b>Nenhum preço encontrado</b><span>Comece uma nova coleta ou ajuste os filtros.</span></div></div>
+      </div>
+      <aside class="panel insight-panel"><p class="eyebrow">LEITURA RÁPIDA</p><h2>Preços abaixo</h2><p class="muted">Produtos com preço de venda informado ou estimado abaixo do preço médio filtrado.</p><div id="insights" class="insights"></div></aside>
+    </section>
+    <p class="footnote">Os dados são salvos neste dispositivo. Use <b>Exportar</b> para editar no Excel e depois <b>Importar</b> a planilha atualizada.</p>
+  </main>
+  <dialog id="entryDialog"><form method="dialog" id="entryForm"><div class="dialog-header"><div><p class="eyebrow" id="dialogEyebrow">NOVA COLETA</p><h2 id="dialogTitle">Adicionar preço</h2></div><button type="button" class="close-button" id="closeDialog">×</button></div>
+    <div id="photoNotice" class="notice" hidden><span>▣</span><div><b>Foto recebida</b><small>Confira os campos reconhecidos e complete o que faltar.</small><img id="photoPreview" alt="Pré-visualização da etiqueta"></div></div>
+    <div id="audioNotice" class="notice" hidden><span>◉</span><div><b>Transcrição recebida</b><small id="transcriptText"></small></div></div>
+    <div class="form-grid"><label>Data *<input required id="date" type="date"></label><label>Cidade<input id="city" placeholder="Ex.: São Paulo"></label><label>País *<input required id="country" placeholder="Ex.: Brasil"></label><label>Estabelecimento *<input required id="store" placeholder="Nome do supermercado"></label><label>Proteína *<select required id="protein"><option value="">Selecione</option><option>Frango</option><option>Bovino</option><option>Carneiro</option><option>Goat</option></select></label><label>Temperatura *<select required id="temperature"><option value="">Selecione</option><option>Congelado</option><option>Resfriado</option></select></label><label class="span-2">Produto *<select required id="product"></select></label><label>Peso da embalagem (kg) *<input required id="weight" type="number" min="0.001" step="0.001" placeholder="0,000"></label><label>Preço da embalagem *<input required id="packPrice" type="number" min="0" step="0.01" placeholder="0,00"></label><label>Preço por kg<input id="priceKg" type="number" min="0" step="0.01" placeholder="Calculado automaticamente"></label><label>Margem do revendedor (%)<input id="margin" type="number" min="0" max="100" step="0.1" value="20"></label><label>Preço venda indústria → retailer<input id="industryPrice" type="number" min="0" step="0.01" placeholder="Opcional"></label><label>RSP consumidor (por kg)<input id="rsp" type="number" min="0" step="0.01" placeholder="Preço de varejo"></label></div>
+    <div class="calculation"><span>Venda estimada ao estabelecimento</span><strong id="estimatedSale">—</strong><small>Calculada a partir do RSP menos a margem do revendedor. O preço direto da indústria prevalece quando informado.</small></div>
+    <div class="dialog-actions"><button type="button" class="secondary-button" id="cancelDialog">Cancelar</button><button class="primary-button" type="submit">Salvar coleta</button></div>
+  </form></dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
