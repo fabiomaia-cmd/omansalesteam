@@ -89,13 +89,37 @@ function applyTranscript(text) {
   const nums = [...text.matchAll(/(\d+(?:[,.]\d+)?)/g)].map(match => Number(match[1].replace(",", "."))); if (nums.length >= 2) { $("weight").value = nums[0]; $("packPrice").value = nums[1]; } else if (nums.length === 1) $("packPrice").value = nums[0];
   updateCalculation();
 }
+function transcriptValue(text, labels) {
+  for (const label of labels) {
+    const match = text.match(new RegExp(`(?:^|[.;])\\s*${label}\\s*[:=-]\\s*([^,;.\\n]+)`, "i"));
+    if (match) return match[1].trim();
+  }
+  return "";
+}
+function transcriptRecords(text) {
+  const productParts = text.split(/(?=\bproduct\s*(?:number\s*)?\d+\s*[:=-]?)/i).filter(part => /\bproduct\s*(?:number\s*)?\d+/i.test(part));
+  const parts = productParts.length ? productParts : [text];
+  const context = productParts.length ? text.slice(0, text.indexOf(productParts[0])) : "";
+  return parts.map(part => {
+    const combined = `${context}; ${part}`;
+    const productText = transcriptValue(part, ["product"]) || part;
+    const lower = combined.toLowerCase();
+    const protein = ["Chicken", "Beef", "Lamb", "Goat"].find(item => lower.includes(item.toLowerCase())) || "";
+    const product = Object.values(PRODUCTS).flat().find(item => productText.toLowerCase().includes(item.toLowerCase())) || "";
+    const subProduct = Object.values(SUBPRODUCTS).flatMap(group => Object.values(group).flat()).find(item => productText.toLowerCase().includes(item.toLowerCase())) || "";
+    const numbers = [...part.matchAll(/(\d+(?:[,.]\d+)?)/g)].map(match => Number(match[1].replace(",", ".")));
+    const weightMatch = part.match(/(\d+(?:[,.]\d+)?)\s*kg/i);
+    const priceMatch = part.match(/(?:rsp|price|aed|omr|sar|qar|bhd|kwd|iqd|yer)\D*(\d+(?:[,.]\d+)?)/i);
+    return { text: combined, context, protein, product, subProduct, weight: weightMatch ? Number(weightMatch[1].replace(",", ".")) : numbers[0], price: priceMatch ? Number(priceMatch[1].replace(",", ".")) : numbers[1] };
+  });
+}
 function startAudio() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { $("transcriptionStatus").textContent = "Speech recognition is not supported in this browser."; return; }
   recognition = new SpeechRecognition(); recognition.lang = "en-US"; recognition.continuous = true; recognition.interimResults = true;
-  let transcriptBuffer = $("transcriptEditor").value.trim();
+  let finalTranscript = $("transcriptEditor").value.trim();
   $("startTranscription").disabled = true; $("stopTranscription").disabled = false; $("transcriptionStatus").textContent = "Recording... speak the complete collection.";
-  recognition.onresult = event => { let transcript = ""; for (let index = event.resultIndex; index < event.results.length; index++) transcript += `${event.results[index][0].transcript} `; transcriptBuffer = `${transcriptBuffer} ${transcript}`.trim(); $("transcriptEditor").value = transcriptBuffer; };
+  recognition.onresult = event => { let interim = ""; for (let index = event.resultIndex; index < event.results.length; index++) { const result = event.results[index]; if (result.isFinal) finalTranscript += `${result[0].transcript.trim()} `; else interim += result[0].transcript; } $("transcriptEditor").value = `${finalTranscript}${interim}`.trim(); };
   recognition.onerror = () => $("transcriptionStatus").textContent = "Recording failed. You can edit the text and try again."; recognition.onend = () => { $("startTranscription").disabled = false; $("stopTranscription").disabled = true; if ($("transcriptEditor").value) $("transcriptionStatus").textContent = "Transcript ready to review."; }; recognition.start();
 }
 function stopAudio() { if (recognition) recognition.stop(); }
@@ -106,8 +130,9 @@ document.querySelectorAll(".filters input,.filters select").forEach(el => el.add
 if (window.location.hash === "#transcribe") {
   document.querySelector("main.shell:not(#transcriptionPage)").hidden = true; $("transcriptionPage").hidden = false;
   $("startTranscription").onclick = startAudio; $("stopTranscription").onclick = stopAudio; $("backToCollection").onclick = () => window.close();
-  $("applyTranscript").onclick = () => { const text = $("transcriptEditor").value.trim(); if (!text) { $("transcriptionStatus").textContent = "Enter or record a transcript first."; return; } if (window.opener && !window.opener.closed) { window.opener.postMessage({ type: "pricescope-transcript", text }, window.location.origin === "null" ? "*" : window.location.origin); window.close(); } else { localStorage.setItem("pricescope-pending-transcript", text); window.location.hash = ""; window.location.reload(); } };
+  const sendTranscript = (batch = false) => { const text = $("transcriptEditor").value.trim(); if (!text) { $("transcriptionStatus").textContent = "Enter or record a transcript first."; return; } if (window.opener && !window.opener.closed) { window.opener.postMessage({ type: batch ? "pricescope-transcript-batch" : "pricescope-transcript", text }, window.location.origin === "null" ? "*" : window.location.origin); window.close(); } else { localStorage.setItem(batch ? "pricescope-pending-transcript-batch" : "pricescope-pending-transcript", text); window.location.hash = ""; window.location.reload(); } };
+  $("applyTranscript").onclick = () => sendTranscript(false); $("applyTranscriptBatch").onclick = () => sendTranscript(true);
 } else {
-  window.addEventListener("message", event => { if (event.data?.type === "pricescope-transcript") { openDialog(null, null, event.data.text); applyTranscript(event.data.text); showToast("Transcript applied. Review the recognized fields and save."); } });
+  window.addEventListener("message", event => { if (event.data?.type === "pricescope-transcript") { openDialog(null, null, event.data.text); applyTranscript(event.data.text); showToast("Transcript applied. Review the recognized fields and save."); } if (event.data?.type === "pricescope-transcript-batch") { const items = transcriptRecords(event.data.text); const added = items.map(item => { openDialog(null, null, item.text); applyTranscript(item.text); const record = recordFromForm(); if (item.weight) record.weight = item.weight; if (item.price) { record.packPrice = item.price; record.priceKg = item.weight ? item.price / item.weight : item.price; record.priceUsdKg = record.priceKg / (FX_TO_USD[record.currency] || 1); record.industryPrice = record.priceKg * (1 - record.margin / 100); } if (item.protein) record.protein = item.protein; if (item.product) record.product = item.product; if (item.subProduct) record.subProduct = item.subProduct; closeDialog(); return record; }); records = [...added, ...records]; save(); showToast(`${added.length} product record(s) added from transcript.`); } });
 }
 let deferredPrompt; configureFormLabels(); window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); deferredPrompt = event; $("installBtn").hidden = false; }); $("installBtn").onclick = async () => { if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; $("installBtn").hidden = true; } }; if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js")); render();
