@@ -26,16 +26,17 @@ const today = () => new Date().toISOString().slice(0, 10);
 const money = (value, currency = "USD") => value === "" || value == null || Number.isNaN(Number(value)) ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value));
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
 function normalizeRecord(record) { return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, typeof value === "string" && LEGACY[value] ? LEGACY[value] : value])); }
+function nullableNumber(value) { return value === "" || value == null || value === undefined ? null : Number(value); }
 function toDbRecord(record) {
   return {
     id: record.id, date: record.date, manufacturer: record.manufacturer, collector: record.collector,
     channel: record.channel, city: record.city, country: record.country, currency: record.currency,
     retailer: record.store, protein: record.protein, temperature: record.temperature, product: record.product,
-    sub_product: record.subProduct, package_weight_kg: record.weight, package_price: record.packPrice,
-    price_kg: record.priceKg, price_usd_kg: record.priceUsdKg, margin_pct: record.margin,
-    industry_price: record.industryPrice, manual_industry_price: record.manualIndustryPrice,
-    promotion: record.promotion, full_price: record.fullPrice, promo_pack: record.promoPack,
-    combo_qty: record.comboQty, combo_unit_weight: record.comboUnitWeight, combo_total_price: record.comboTotalPrice
+    sub_product: record.subProduct || null, package_weight_kg: nullableNumber(record.weight), package_price: nullableNumber(record.packPrice),
+    price_kg: nullableNumber(record.priceKg), price_usd_kg: nullableNumber(record.priceUsdKg), margin_pct: nullableNumber(record.margin),
+    industry_price: nullableNumber(record.industryPrice), manual_industry_price: Boolean(record.manualIndustryPrice),
+    promotion: Boolean(record.promotion), full_price: nullableNumber(record.fullPrice), promo_pack: Boolean(record.promoPack),
+    combo_qty: nullableNumber(record.comboQty), combo_unit_weight: nullableNumber(record.comboUnitWeight), combo_total_price: nullableNumber(record.comboTotalPrice)
   };
 }
 function fromDbRecord(record) {
