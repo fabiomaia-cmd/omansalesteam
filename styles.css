@@ -4,3 +4,4 @@
 
 
 
+:root{--navy:#071d2b;--ink:#122832;--muted:#71828a;--line:#e1e9eb;--soft:#f4f8f8;--teal:#0b827b;--teal-dark:#06645f;--orange:#ec8b4c;--red:#c54d4d;--white:#fff}.report-filter-actions{display:flex;align-items:center;gap:14px}.report-record-count{display:inline-flex;align-items:center;border:1px solid #9bd2cc;border-radius:999px;background:#e5f3f1;color:var(--teal-dark);padding:7px 12px;font-size:13px;font-weight:800}
