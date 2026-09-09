@@ -167,6 +167,15 @@ function configureFormLabels() {
       weightField.parentElement.insertBefore(packagingField, weightField);
     }
   }
+  const formGrid = $('entryForm')?.querySelector('.form-grid');
+  const firstFields = ['date', 'country', 'city', 'collector', 'channel', 'store', 'manufacturer', 'countryOfOrigin']
+    .map(id => $(id)?.parentElement)
+    .filter(Boolean);
+  if (formGrid && firstFields.length === 8) {
+    const orderedFields = document.createDocumentFragment();
+    firstFields.forEach(field => orderedFields.appendChild(field));
+    formGrid.insertBefore(orderedFields, formGrid.firstElementChild);
+  }
   $("packPrice").parentElement.firstChild.textContent = "RSP Price (Retail Sales Price) ";
   $("priceKg").type = "hidden";
   $("priceKg").parentElement.hidden = true;
