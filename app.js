@@ -159,6 +159,14 @@ async function deleteRecords(ids) {
 function reportStorageError(error) { console.error(error); showToast(`Database error: ${error.message || error}`); }
 function showToast(text) { const toast = $("toast"); toast.textContent = text; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 7000); }
 function configureFormLabels() {
+  if (!$('packagingType')) {
+    const weightField = $('weight')?.parentElement;
+    if (weightField) {
+      const packagingField = document.createElement('label');
+      packagingField.innerHTML = 'Packaging<select id="packagingType"><option value="">Select product first</option></select><input id="packagingTypeCustom" class="conditional-input" placeholder="Enter packaging type" hidden>';
+      weightField.parentElement.insertBefore(packagingField, weightField);
+    }
+  }
   $("packPrice").parentElement.firstChild.textContent = "RSP Price (Retail Sales Price) ";
   $("priceKg").type = "hidden";
   $("priceKg").parentElement.hidden = true;
