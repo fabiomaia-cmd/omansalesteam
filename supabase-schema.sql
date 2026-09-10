@@ -43,3 +43,9 @@ create policy "Public can update price records"
 
 create policy "Public can delete price records"
   on public.price_records for delete to anon using (true);
+
+-- Migration: add Country of origin and Packaging fields to the live table.
+-- The app (app.js) reads/writes the "collections" table, not "price_records" above.
+-- Run this block in the Supabase SQL Editor against your project.
+alter table public.collections add column if not exists origin_country text;
+alter table public.collections add column if not exists packaging_type text;
