@@ -1,5 +1,5 @@
 const PRODUCTS = {
-  Chicken: ["Whole Chicken", "Cuts", "Offals"],
+  Chicken: ["Whole Chicken", "Cuts", "Offals", "FPP"],
   Beef: ["Primals in Vaccum", "Cubes and Cuts", "Bone-in Beef", "Offals", "Hamburger", "Minced Beef", "Skewers", "Steaks", "Kebabs"],
   Lamb: ["Cuts with bone", "Boneless cuts", "Offals"],
   Goat: ["Cuts with bone", "Boneless cuts", "Offals"]
@@ -28,7 +28,7 @@ const PACKAGING_TYPES = {
   Steaks: ["Foam tray", "Thermo formed tray", "Skin pack"],
   "Whole Chicken": ["Plastic tray", "Plastic bag", "Foam tray"],
   Cuts: ["Foam tray", "IWP", "Thermo tray"],
-  FPP: ["Thermo formed vaccum", "Combo bag", "Skin pack", "Carton", "Foam tray"]
+  FPP: ["Thermo formed vaccum", "Combo bag", "Skin pack", "Carton", "Foam tray", "Tubes"]
 };
 const COUNTRIES = ["UAE", "Oman", "KSA", "Qatar", "Bahrain", "Kuwait", "Iraq", "Yemen"];
 const CITIES = { Oman: ["Muscat", "Salalah", "Sohar", "Ibri", "Nizwa", "Dhank", "Barka", "Seeb", "Sur", "Rustaq", "Samail"], UAE: ["Dubai", "Sharjah", "Abu Dhabi", "Al Ain", "Fujairah", "Ajman", "Ras Al Khaimah", "Umm Al Quwain"], Qatar: ["Doha", "Al Wakrah", "Mesaieed", "Rayyan"], KSA: ["Riyadh", "Jeddah", "Dammam", "Khobar", "Makkah", "Madinah"], Bahrain: ["Manama", "Muharraq", "Riffa"], Kuwait: ["Kuwait City", "Ahmadi", "Salmiya", "Fahaheel"], Iraq: ["Baghdad", "Basra", "Najaf", "Erbil"], Yemen: ["Sanaa", "Aden", "Taiz"] };
@@ -221,15 +221,26 @@ function selectedOriginCountry() { return $("countryOfOrigin").value === "__cust
 function selectedCity() { return $("city").value === "__custom" ? $("cityCustom").value.trim() : $("city").value; }
 function calculatedWeight() { return $("promoPack").checked ? number($("comboQty").value) * number($("comboUnitWeight").value) : number($("weight").value); }
 function calculatedPackPrice() { return number($("packPrice").value); }
+function industryBasisUsdKg(weight, fx) {
+  // When a collection is a promotion, the industry price must be derived from the
+  // full (pre-discount) price, not the discounted shelf price — the promo is a
+  // retailer-funded markdown and should not flow into the suggested industry price.
+  const isPromotion = $("promotion").checked, fullPrice = number($("fullPrice").value);
+  if (isPromotion && fullPrice && weight) return (fullPrice / weight) / fx;
+  return null;
+}
 function updateCalculation() {
-  const weight = calculatedWeight(), packPrice = calculatedPackPrice(), marketPrice = weight && packPrice ? packPrice / weight : 0, fx = FX_TO_USD[$("currency").value] || 1, marketPriceUsd = marketPrice / fx, manual = number($("industryPrice").value), margin = number($("margin").value), industryUsd = manual || marketPriceUsd * (1 - margin / 100);
+  const weight = calculatedWeight(), packPrice = calculatedPackPrice(), marketPrice = weight && packPrice ? packPrice / weight : 0, fx = FX_TO_USD[$("currency").value] || 1, marketPriceUsd = marketPrice / fx, manual = number($("industryPrice").value), margin = number($("margin").value);
+  const basisUsd = industryBasisUsdKg(weight, fx) ?? marketPriceUsd;
+  const industryUsd = manual || basisUsd * (1 - margin / 100);
   $("priceKg").value = marketPrice ? marketPrice : ""; $("priceUsdKg").value = marketPrice ? marketPriceUsd.toFixed(2) : ""; $("estimatedSale").textContent = industryUsd ? money(industryUsd, "USD") : "—";
   updateLocalProduction();
 }
 function recordFromForm() {
   const weight = calculatedWeight(), packPrice = calculatedPackPrice(), priceKg = weight && packPrice ? packPrice / weight : 0, currency = $("currency").value, fx = FX_TO_USD[currency] || 1, priceUsdKg = priceKg / fx, manual = number($("industryPrice").value), margin = number($("margin").value);
+  const basisUsd = industryBasisUsdKg(weight, fx) ?? priceUsdKg;
   const country = selectedCountry(), originCountry = selectedOriginCountry();
-  return { id: editingId || crypto.randomUUID(), date: $("date").value, manufacturer: $("manufacturer").value.trim(), originCountry, collector: $("collector").value.trim(), channel: $("channel").value, city: selectedCity(), country, currency, store: $("store").value.trim(), protein: $("protein").value, temperature: $("temperature").value, product: $("product").value, subProduct: $("subProduct").value === "__custom" ? $("subProductCustom").value.trim() : $("subProduct").value, packagingType: $("packagingType").value === "__custom" ? $("packagingTypeCustom").value.trim() : $("packagingType").value, localProduction: localProductionCategory(country, originCountry), weight, packPrice, priceKg, priceUsdKg, margin, industryPrice: manual || priceUsdKg * (1 - margin / 100), manualIndustryPrice: Boolean(manual), promotion: $("promotion").checked, fullPrice: $("promotion").checked ? number($("fullPrice").value) : "", promoPack: $("promoPack").checked, comboQty: $("promoPack").checked ? number($("comboQty").value) : "", comboUnitWeight: $("promoPack").checked ? number($("comboUnitWeight").value) : "", comboTotalPrice: $("promoPack").checked ? packPrice : "" };
+  return { id: editingId || crypto.randomUUID(), date: $("date").value, manufacturer: $("manufacturer").value.trim(), originCountry, collector: $("collector").value.trim(), channel: $("channel").value, city: selectedCity(), country, currency, store: $("store").value.trim(), protein: $("protein").value, temperature: $("temperature").value, product: $("product").value, subProduct: $("subProduct").value === "__custom" ? $("subProductCustom").value.trim() : $("subProduct").value, packagingType: $("packagingType").value === "__custom" ? $("packagingTypeCustom").value.trim() : $("packagingType").value, localProduction: localProductionCategory(country, originCountry), weight, packPrice, priceKg, priceUsdKg, margin, industryPrice: manual || basisUsd * (1 - margin / 100), manualIndustryPrice: Boolean(manual), promotion: $("promotion").checked, fullPrice: $("promotion").checked ? number($("fullPrice").value) : "", promoPack: $("promoPack").checked, comboQty: $("promoPack").checked ? number($("comboQty").value) : "", comboUnitWeight: $("promoPack").checked ? number($("comboUnitWeight").value) : "", comboTotalPrice: $("promoPack").checked ? packPrice : "" };
 }
 function filteredRecords() { const from = $("filterFrom").value, to = $("filterTo").value, promotion = $("filterPromotion").value; return records.filter(r => (!from || r.date >= from) && (!to || r.date <= to) && (!$("filterCountry").value || r.country === $("filterCountry").value) && (!$("filterStore").value || r.store === $("filterStore").value) && (!$("filterProtein").value || r.protein === $("filterProtein").value) && (!$("filterTemp").value || r.temperature === $("filterTemp").value) && (!$("filterProduct").value || r.product === $("filterProduct").value) && (promotion === "" || (promotion === "with" ? Boolean(r.promotion) : !r.promotion))); }
 function refreshFilterOptions() { const fill = (id, values, label) => { const current = $(id).value; $(id).innerHTML = `<option value="">${label}</option>${[...new Set(values.filter(Boolean))].sort().map(v => `<option ${v === current ? "selected" : ""}>${escapeHtml(v)}</option>`).join("")}`; }; fill("filterCountry", records.map(r => r.country), "All countries"); fill("filterStore", records.map(r => r.store), "All retailers"); fill("filterProduct", Object.values(PRODUCTS).flat(), "All"); }
@@ -253,14 +264,30 @@ function refreshReportFilters() {
   fill("reportProduct", records.map(r => r.product), "All products");
   fill("reportSubProduct", records.map(r => r.subProduct), "All sub-products");
 }
+function renderReportPriceList(data) {
+  const box = $("reportPriceList"), countLabel = $("reportPriceListCount");
+  if (countLabel) countLabel.textContent = data.length;
+  if (!box) return;
+  if (!data.length) { box.innerHTML = `<table class="report-table compact"><thead><tr><th>Date</th><th>Country / City</th><th>Retailer</th><th>Manufacturer</th><th>Protein / Product</th><th>Temp.</th><th>RSP (US$/kg)</th><th>Industry (US$/kg)</th><th>Promotion</th></tr></thead><tbody><tr><td colspan="9">No rows available</td></tr></tbody></table>`; return; }
+  const rows = [...data].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(r => {
+    // r.currency has already been normalized to "USD" by reportFilteredRecords(), so the
+    // full-price-in-USD is derived as a ratio of the (currency-agnostic) full/pack prices
+    // applied to the already-known priceUsdKg, rather than re-converting via FX here.
+    const fullPriceUsd = (r.promotion && r.fullPrice && r.packPrice) ? number(r.priceUsdKg) * (number(r.fullPrice) / number(r.packPrice)) : 0;
+    return `<tr><td>${escapeHtml(r.date || "—")}</td><td>${escapeHtml(r.country || "—")}${r.city ? ` · ${escapeHtml(r.city)}` : ""}</td><td>${escapeHtml(r.store || "—")}</td><td>${escapeHtml(r.manufacturer || "—")}</td><td><b>${escapeHtml(r.protein)}</b><br><span class="subtle">${escapeHtml(r.product)}${r.subProduct ? ` · ${escapeHtml(r.subProduct)}` : ""}</span></td><td>${escapeHtml(r.temperature)}</td><td>${money(r.priceKg, "USD")}</td><td>${r.industryPrice ? money(r.industryPrice, "USD") : "—"}</td><td>${r.promotion ? `Yes${fullPriceUsd ? ` (full ${money(fullPriceUsd, "USD")})` : ""}` : "—"}</td></tr>`;
+  }).join("");
+  box.innerHTML = `<table class="report-table compact"><thead><tr><th>Date</th><th>Country / City</th><th>Retailer</th><th>Manufacturer</th><th>Protein / Product</th><th>Temp.</th><th>RSP (US$/kg)</th><th>Industry (US$/kg)</th><th>Promotion</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 function renderReport() {
   refreshReportFilters();
   const data = reportFilteredRecords();
   $("reportRecordCount").textContent = `${data.length} record${data.length === 1 ? "" : "s"} shown`;
+  renderReportPriceList(data);
+  if ($("reportHeadline")) $("reportHeadline").innerHTML = data.length ? "" : `<li>No data in this filter yet — adjust the filters above to generate an executive summary.</li>`;
   if (!data.length) {
     $("reportSummary").innerHTML = `<div class="report-stat"><small>Average RSP</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Min RSP</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Max RSP</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Std. deviation RSP</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Average industry</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Min industry</small><strong>—</strong><span>US$/kg · No data</span></div><div class="report-stat"><small>Max industry</small><strong>—</strong><span>US$/kg · No data</span></div>`;
     $("reportProductTemp").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Min RSP</th><th>Avg RSP</th><th>Max RSP</th><th>Min Industry</th><th>Avg Industry</th><th>Max Industry</th></tr></thead><tbody><tr><td colspan="8">No rows available</td></tr></tbody></table>`;
-    $("reportCountryCity").innerHTML = `<table class="report-table"><thead><tr><th>Country</th><th>City</th><th>Avg</th><th>Trend</th></tr></thead><tbody><tr><td colspan="4">No rows available</td></tr></tbody></table>`;
+    $("reportCountryCity").innerHTML = `<table class="report-table"><thead><tr><th>Country</th><th>City</th><th>Avg RSP</th><th>Avg Industry</th><th>Records</th><th>Trend</th></tr></thead><tbody><tr><td colspan="6">No rows available</td></tr></tbody></table>`;
     $("reportManufacturers").innerHTML = `<table class="report-table"><thead><tr><th>Manufacturer</th><th>Avg</th><th>Products</th></tr></thead><tbody><tr><td colspan="3">No rows available</td></tr></tbody></table>`;
     if ($("reportLocalProduction")) $("reportLocalProduction").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Local</th><th>GCC</th><th>Other</th></tr></thead><tbody><tr><td colspan="5">No rows available</td></tr></tbody></table>`;
     if ($("reportPackaging")) $("reportPackaging").innerHTML = `<table class="report-table"><thead><tr><th>Packaging</th><th>Avg RSP</th><th>Avg industry</th><th>Records</th></tr></thead><tbody><tr><td colspan="4">No rows available</td></tr></tbody></table>`;
@@ -304,13 +331,16 @@ function renderReport() {
   const geographyMap = {};
   data.forEach(r => {
     const key = `${r.country}|${r.city}`;
-    if (!geographyMap[key]) geographyMap[key] = { country: r.country, city: r.city || "Unknown", prices: [] };
+    if (!geographyMap[key]) geographyMap[key] = { country: r.country, city: r.city || "Unknown", prices: [], industry: [] };
     geographyMap[key].prices.push(number(r.priceKg));
+    geographyMap[key].industry.push(number(r.industryPrice));
   });
   const geographyRows = Object.values(geographyMap).map(item => {
     const values = item.prices.filter(Boolean);
-    const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
-    return { ...item, avg };
+    const industryValues = item.industry.filter(Boolean);
+    const avg = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+    const avgIndustry = industryValues.length ? industryValues.reduce((sum, value) => sum + value, 0) / industryValues.length : 0;
+    return { ...item, avg, avgIndustry, count: item.prices.length };
   }).sort((a, b) => b.avg - a.avg).slice(0, 8);
 
   const manufacturerMap = {};
@@ -346,7 +376,11 @@ function renderReport() {
     const rspUsd = item.pricesUsd.filter(Boolean);
     const spread = rsp.length ? Math.max(...rsp) - Math.min(...rsp) : 0;
     const avgRspUsd = rspUsd.length ? rspUsd.reduce((sum, value) => sum + value, 0) / rspUsd.length : 0;
-    const marginPct = avgIndustry ? ((avgIndustry - avgRspUsd) / avgIndustry) * 100 : 0;
+    // Margin = how much RSP exceeds the industry price, expressed as % of RSP
+    // (mirrors the entry-form definition where industry_price = RSP * (1 - margin/100)).
+    // Previously this compared (industry - RSP) / industry, which produced large
+    // negative percentages since industry price is normally lower than RSP.
+    const marginPct = avgRspUsd ? ((avgRspUsd - avgIndustry) / avgRspUsd) * 100 : 0;
     return { retailer: item.retailer, avgRsp, avgRspUsd, avgIndustry, spread, marginPct };
   }).sort((a, b) => a.avgRsp - b.avgRsp);
 
@@ -355,11 +389,33 @@ function renderReport() {
   const marketSpread = rspValues.length ? Math.max(...rspValues) - Math.min(...rspValues) : 0;
   const pricingGapPct = avgPrice ? ((priceMax - priceMin) / avgPrice) * 100 : 0;
 
+  if ($("reportHeadline")) {
+    const bullets = [];
+    if (avgPrice && avgIndustry) {
+      const industryVsRsp = ((avgPrice - avgIndustry) / avgPrice) * 100;
+      bullets.push(`Average industry price is <b>${money(avgIndustry, "USD")}/kg</b>, ${Number(industryVsRsp).toFixed(0)}% below the average RSP of ${money(avgPrice, "USD")}/kg across ${data.length} record${data.length === 1 ? "" : "s"}.`);
+    }
+    if (topValueRetailer && retailerRows.length > 1) bullets.push(`<b>${escapeHtml(topValueRetailer.retailer)}</b> has the lowest average RSP (${money(topValueRetailer.avgRsp, currency)}/kg) among ${retailerRows.length} retailers in this view.`);
+    const widestSpread = [...productTempRows].sort((a, b) => b.spread - a.spread)[0];
+    if (widestSpread && widestSpread.spread > 0) bullets.push(`Widest pricing gap: <b>${escapeHtml(widestSpread.product)}</b> (${escapeHtml(widestSpread.temperature)}) ranges from ${money(widestSpread.minRsp, currency)} to ${money(widestSpread.maxRsp, currency)}/kg.`);
+    const promoItems = data.filter(r => r.promotion);
+    if (promoItems.length) {
+      const promoDiscounts = promoItems.map(r => {
+        const fullUsd = (r.fullPrice && r.packPrice) ? number(r.priceUsdKg) * (number(r.fullPrice) / number(r.packPrice)) : 0;
+        return fullUsd ? ((fullUsd - number(r.priceUsdKg)) / fullUsd) * 100 : null;
+      }).filter(value => value != null);
+      const avgPromoDiscount = promoDiscounts.length ? promoDiscounts.reduce((sum, value) => sum + value, 0) / promoDiscounts.length : null;
+      bullets.push(`${promoItems.length} of ${data.length} records (${((promoItems.length / data.length) * 100).toFixed(0)}%) are on promotion${avgPromoDiscount != null ? `, averaging ${avgPromoDiscount.toFixed(0)}% off the full price` : ""}. Industry price for these is calculated on the full price, not the discounted shelf price.`);
+    }
+    if (countries > 1) bullets.push(`View spans ${countries} countries and ${products} product${products === 1 ? "" : "s"} — use the filters to narrow before sharing externally.`);
+    $("reportHeadline").innerHTML = bullets.map(text => `<li>${text}</li>`).join("");
+  }
+
   $("reportSummary").innerHTML = `<div class="report-stat"><small>Average RSP</small><strong>${money(avgPrice, "USD")}</strong><span>US$/kg</span></div><div class="report-stat"><small>Min RSP</small><strong>${money(priceMin, "USD")}</strong><span>US$/kg lowest observed</span></div><div class="report-stat"><small>Max RSP</small><strong>${money(priceMax, "USD")}</strong><span>US$/kg highest observed</span></div><div class="report-stat"><small>Std. deviation RSP</small><strong>${money(rspStdDev, "USD")}</strong><span>US$/kg price dispersion</span></div><div class="report-stat"><small>Average industry</small><strong>${money(avgIndustry, "USD")}</strong><span>US$/kg estimated sell price</span></div><div class="report-stat"><small>Min industry</small><strong>${money(industryMin, "USD")}</strong><span>US$/kg lowest industry</span></div><div class="report-stat"><small>Max industry</small><strong>${money(industryMax, "USD")}</strong><span>US$/kg highest industry</span></div><div class="report-stat"><small>Avg margin</small><strong>${Number(avgMarginPct).toFixed(1)}%</strong><span>vs. industry benchmark</span></div><div class="report-stat"><small>Price spread</small><strong>${money(marketSpread, currency)}</strong><span>${Number(pricingGapPct).toFixed(1)}% market delta</span></div><div class="report-stat"><small>Best value retailer</small><strong>${escapeHtml(topValueRetailer ? topValueRetailer.retailer : "—")}</strong><span>${topValueRetailer ? money(topValueRetailer.avgRsp, currency) : "No retailer"} avg RSP</span></div>`;
 
   $("reportProductTemp").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Min RSP</th><th>Avg RSP</th><th>Max RSP</th><th>Min Industry (US$)</th><th>Avg Industry (US$)</th><th>Max Industry (US$)</th></tr></thead><tbody>${productTempRows.map(row => `<tr><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.temperature)}</td><td>${money(row.minRsp, currency)}</td><td>${money(row.avgRsp, currency)}</td><td>${money(row.maxRsp, currency)}</td><td>${money(row.minInd, "USD")}</td><td>${money(row.avgInd, "USD")}</td><td>${money(row.maxInd, "USD")}</td></tr>`).join("") || `<tr><td colspan="8">No rows available</td></tr>`}</tbody></table>`;
 
-  $("reportCountryCity").innerHTML = `<table class="report-table"><thead><tr><th>Country</th><th>City</th><th>Avg</th><th>Trend</th></tr></thead><tbody>${geographyRows.map(row => `<tr><td>${escapeHtml(row.country)}</td><td>${escapeHtml(row.city)}</td><td>${money(row.avg, currency)}</td><td><div class="report-bar"><span style="width:${Math.min(100, (row.avg / maxGeoAvg) * 100)}%"></span></div></td></tr>`).join("") || `<tr><td colspan="4">No rows available</td></tr>`}</tbody></table>`;
+  $("reportCountryCity").innerHTML = `<table class="report-table"><thead><tr><th>Country</th><th>City</th><th>Avg RSP</th><th>Avg Industry</th><th>Records</th><th>Trend</th></tr></thead><tbody>${geographyRows.map(row => `<tr><td>${escapeHtml(row.country)}</td><td>${escapeHtml(row.city)}</td><td>${money(row.avg, currency)}</td><td>${row.avgIndustry ? money(row.avgIndustry, "USD") : "—"}</td><td>${row.count}</td><td><div class="report-bar"><span style="width:${Math.min(100, (row.avg / maxGeoAvg) * 100)}%"></span></div></td></tr>`).join("") || `<tr><td colspan="6">No rows available</td></tr>`}</tbody></table>`;
   $("reportManufacturers").innerHTML = `<table class="report-table"><thead><tr><th>Manufacturer</th><th>Avg</th><th>Products</th></tr></thead><tbody>${manufacturerRows.map(row => `<tr><td>${escapeHtml(row.manufacturer)}</td><td>${money(row.avg, currency)}</td><td>${row.products}</td></tr>`).join("") || `<tr><td colspan="3">No rows available</td></tr>`}</tbody></table>`;
 
   if ($("reportLocalProduction")) {
@@ -393,8 +449,10 @@ function renderReport() {
   }
 
   const similarProductRows = productTempRows.map(row => `<tr><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.temperature)}</td><td>${money(row.avgRsp, currency)}</td><td>${money(row.avgInd, "USD")}</td><td><div class="report-bar"><span style="width:${Math.min(100, (row.avgRsp / maxChartAvg) * 100)}%"></span></div></td></tr>`).join("");
-  const productPriorityRows = [...productTempRows].sort((a, b) => ((b.avgInd - b.avgRsp) / (b.avgInd || 1)) - ((a.avgInd - a.avgRsp) / (a.avgInd || 1))).slice(0, 5).map(row => {
-    const marginPct = row.avgInd ? ((row.avgInd - row.avgRspUsd) / row.avgInd) * 100 : 0;
+  // Sorted by highest realized margin (RSP over industry price) first — the products
+  // with the most retail markup room are the commercial priorities.
+  const productPriorityRows = [...productTempRows].sort((a, b) => ((b.avgRspUsd - b.avgInd) / (b.avgRspUsd || 1)) - ((a.avgRspUsd - a.avgInd) / (a.avgRspUsd || 1))).slice(0, 5).map(row => {
+    const marginPct = row.avgRspUsd ? ((row.avgRspUsd - row.avgInd) / row.avgRspUsd) * 100 : 0;
     return `<tr><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.temperature)}</td><td>${money(row.avgRsp, currency)}</td><td>${money(row.avgInd, "USD")}</td><td>${Number(marginPct).toFixed(1)}%</td></tr>`;
   }).join("");
   const retailerSpreadRows = retailerRows.slice(0, 5).map(row => `<tr><td>${escapeHtml(row.retailer)}</td><td>${money(row.avgRsp, currency)}</td><td>${money(row.avgIndustry, "USD")}</td><td>${money(row.spread, currency)}</td><td>${Number(row.marginPct).toFixed(1)}%</td></tr>`).join("");
