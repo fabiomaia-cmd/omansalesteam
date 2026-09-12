@@ -122,7 +122,7 @@ function toDbRecord(record) {
   return {
     id: record.id, date: record.date, manufacturer: record.manufacturer, collector: record.collector,
     channel: record.channel, city: record.city, country: record.country, currency: record.currency,
-    origin_country: record.originCountry || null, retailer: record.store, protein: record.protein, temperature: record.temperature, product: record.product,
+    origin_country: record.originCountry || null, local_production: localProductionCategory(record.country, record.originCountry) || null, retailer: record.store, protein: record.protein, temperature: record.temperature, product: record.product,
     sub_product: record.subProduct || null, packaging_type: record.packagingType || null, package_weight_kg: nullableNumber(record.weight), package_price: nullableNumber(record.packPrice),
     price_kg: nullableNumber(record.priceKg), price_usd_kg: nullableNumber(record.priceUsdKg), margin_pct: nullableNumber(record.margin),
     industry_price: nullableNumber(record.industryPrice) == null ? null : nullableNumber(record.industryPrice) * (FX_TO_USD[record.currency] || 1), manual_industry_price: Boolean(record.manualIndustryPrice),
@@ -134,7 +134,7 @@ function fromDbRecord(record) {
   return normalizeRecord({
     id: record.id, date: record.date, manufacturer: record.manufacturer, collector: record.collector,
     channel: record.channel, city: record.city, country: record.country, currency: record.currency,
-    originCountry: record.origin_country || "", store: record.retailer, protein: record.protein, temperature: record.temperature, product: record.product,
+    originCountry: record.origin_country || "", localProduction: record.local_production || "", store: record.retailer, protein: record.protein, temperature: record.temperature, product: record.product,
     subProduct: record.sub_product, packagingType: record.packaging_type || "", weight: Number(record.package_weight_kg), packPrice: Number(record.package_price),
     priceKg: Number(record.price_kg), priceUsdKg: Number(record.price_usd_kg), margin: Number(record.margin_pct),
     industryPrice: Number(record.industry_price) / (FX_TO_USD[record.currency] || 1), manualIndustryPrice: record.manual_industry_price,
@@ -193,7 +193,7 @@ function togglePackagingCustom() { if (!$("packagingType") || !$("packagingTypeC
 function suggestedRetailMargin(protein = $("protein").value, country = selectedCountry()) { const baseMargin = ["Beef", "Lamb"].includes(protein) ? 30 : protein === "Chicken" ? 20 : 20; return baseMargin + (COUNTRY_VAT_RATES[country] ?? 0); }
 function countryVatRate(country = selectedCountry()) { return COUNTRY_VAT_RATES[country] ?? 0; }
 function applySuggestedRetailMargin() { if (!$("margin").dataset.manualOverride) $("margin").value = suggestedRetailMargin(); }
-function localProductionCategory(country, originCountry) { if (!country || !originCountry) return ""; if (originCountry === country) return "Local"; if (GCC_COUNTRIES.includes(originCountry)) return "GCC"; return "Other"; }
+function localProductionCategory(country, originCountry) { const c = (country || "").trim(), o = (originCountry || "").trim(); if (!c || !o) return ""; if (o === c) return "Local"; if (GCC_COUNTRIES.includes(o)) return "GCC"; return "Others"; }
 function updateLocalProduction() { if (!$("localProduction")) return; $("localProduction").value = localProductionCategory(selectedCountry(), selectedOriginCountry()) || "—"; }
 function average(values) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
 function populateCountryFields(country = $("country").value, city = "") {
@@ -289,7 +289,7 @@ function renderReport() {
     $("reportProductTemp").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Min RSP</th><th>Avg RSP</th><th>Max RSP</th><th>Min Industry</th><th>Avg Industry</th><th>Max Industry</th></tr></thead><tbody><tr><td colspan="8">No rows available</td></tr></tbody></table>`;
     $("reportCountryCity").innerHTML = `<table class="report-table"><thead><tr><th>Country</th><th>City</th><th>Avg RSP</th><th>Avg Industry</th><th>Records</th><th>Trend</th></tr></thead><tbody><tr><td colspan="6">No rows available</td></tr></tbody></table>`;
     $("reportManufacturers").innerHTML = `<table class="report-table"><thead><tr><th>Manufacturer</th><th>Avg</th><th>Products</th></tr></thead><tbody><tr><td colspan="3">No rows available</td></tr></tbody></table>`;
-    if ($("reportLocalProduction")) $("reportLocalProduction").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Local</th><th>GCC</th><th>Other</th></tr></thead><tbody><tr><td colspan="5">No rows available</td></tr></tbody></table>`;
+    if ($("reportLocalProduction")) $("reportLocalProduction").innerHTML = `<table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Local</th><th>GCC</th><th>Others</th></tr></thead><tbody><tr><td colspan="5">No rows available</td></tr></tbody></table>`;
     if ($("reportPackaging")) $("reportPackaging").innerHTML = `<table class="report-table"><thead><tr><th>Packaging</th><th>Avg RSP</th><th>Avg industry</th><th>Records</th></tr></thead><tbody><tr><td colspan="4">No rows available</td></tr></tbody></table>`;
     return;
   }
@@ -420,20 +420,20 @@ function renderReport() {
 
   if ($("reportLocalProduction")) {
     const localProductionMap = {};
-    const localProductionTotals = { Local: [], GCC: [], Other: [] };
+    const localProductionTotals = { Local: [], GCC: [], Others: [] };
     data.forEach(r => {
       const category = localProductionCategory(r.country, r.originCountry);
       if (!category) return;
       localProductionTotals[category].push(number(r.priceKg));
       const key = `${r.product}|${r.temperature}`;
-      if (!localProductionMap[key]) localProductionMap[key] = { product: r.product, temperature: r.temperature, Local: [], GCC: [], Other: [] };
+      if (!localProductionMap[key]) localProductionMap[key] = { product: r.product, temperature: r.temperature, Local: [], GCC: [], Others: [] };
       localProductionMap[key][category].push(number(r.priceKg));
     });
     const localProductionRows = Object.values(localProductionMap)
-      .map(item => ({ product: item.product, temperature: item.temperature, local: average(item.Local), gcc: average(item.GCC), other: average(item.Other), localCount: item.Local.length, gccCount: item.GCC.length, otherCount: item.Other.length }))
+      .map(item => ({ product: item.product, temperature: item.temperature, local: average(item.Local), gcc: average(item.GCC), other: average(item.Others), localCount: item.Local.length, gccCount: item.GCC.length, otherCount: item.Others.length }))
       .sort((a, b) => (b.localCount + b.gccCount + b.otherCount) - (a.localCount + a.gccCount + a.otherCount))
       .slice(0, 10);
-    $("reportLocalProduction").innerHTML = `<div class="report-summary"><div class="report-stat"><small>Local</small><strong>${localProductionTotals.Local.length ? money(average(localProductionTotals.Local), "USD") : "—"}</strong><span>${localProductionTotals.Local.length} records</span></div><div class="report-stat"><small>GCC</small><strong>${localProductionTotals.GCC.length ? money(average(localProductionTotals.GCC), "USD") : "—"}</strong><span>${localProductionTotals.GCC.length} records</span></div><div class="report-stat"><small>Other</small><strong>${localProductionTotals.Other.length ? money(average(localProductionTotals.Other), "USD") : "—"}</strong><span>${localProductionTotals.Other.length} records</span></div></div><table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Local (US$)</th><th>GCC (US$)</th><th>Other (US$)</th></tr></thead><tbody>${localProductionRows.map(row => `<tr><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.temperature)}</td><td>${row.localCount ? money(row.local, "USD") : "—"}</td><td>${row.gccCount ? money(row.gcc, "USD") : "—"}</td><td>${row.otherCount ? money(row.other, "USD") : "—"}</td></tr>`).join("") || `<tr><td colspan="5">No rows available</td></tr>`}</tbody></table>`;
+    $("reportLocalProduction").innerHTML = `<div class="report-summary"><div class="report-stat"><small>Local</small><strong>${localProductionTotals.Local.length ? money(average(localProductionTotals.Local), "USD") : "—"}</strong><span>${localProductionTotals.Local.length} records</span></div><div class="report-stat"><small>GCC</small><strong>${localProductionTotals.GCC.length ? money(average(localProductionTotals.GCC), "USD") : "—"}</strong><span>${localProductionTotals.GCC.length} records</span></div><div class="report-stat"><small>Others</small><strong>${localProductionTotals.Others.length ? money(average(localProductionTotals.Others), "USD") : "—"}</strong><span>${localProductionTotals.Others.length} records</span></div></div><table class="report-table"><thead><tr><th>Product</th><th>Temp.</th><th>Local (US$)</th><th>GCC (US$)</th><th>Others (US$)</th></tr></thead><tbody>${localProductionRows.map(row => `<tr><td>${escapeHtml(row.product)}</td><td>${escapeHtml(row.temperature)}</td><td>${row.localCount ? money(row.local, "USD") : "—"}</td><td>${row.gccCount ? money(row.gcc, "USD") : "—"}</td><td>${row.otherCount ? money(row.other, "USD") : "—"}</td></tr>`).join("") || `<tr><td colspan="5">No rows available</td></tr>`}</tbody></table>`;
   }
 
   if ($("reportPackaging")) {
