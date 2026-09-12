@@ -27,7 +27,8 @@ const PACKAGING_TYPES = {
   Kebabs: ["Bag", "Carton", "Foam tray"],
   Steaks: ["Foam tray", "Thermo formed tray", "Skin pack"],
   "Whole Chicken": ["Plastic tray", "Plastic bag", "Foam tray"],
-  Cuts: ["Foam tray", "IWP", "Thermo tray"]
+  Cuts: ["Foam tray", "IWP", "Thermo tray"],
+  FPP: ["Thermo formed vaccum", "Combo bag", "Skin pack", "Carton", "Foam tray"]
 };
 const COUNTRIES = ["UAE", "Oman", "KSA", "Qatar", "Bahrain", "Kuwait", "Iraq", "Yemen"];
 const CITIES = { Oman: ["Muscat", "Salalah", "Sohar", "Ibri", "Nizwa", "Dhank", "Barka", "Seeb", "Sur", "Rustaq", "Samail"], UAE: ["Dubai", "Sharjah", "Abu Dhabi", "Al Ain", "Fujairah", "Ajman", "Ras Al Khaimah", "Umm Al Quwain"], Qatar: ["Doha", "Al Wakrah", "Mesaieed", "Rayyan"], KSA: ["Riyadh", "Jeddah", "Dammam", "Khobar", "Makkah", "Madinah"], Bahrain: ["Manama", "Muharraq", "Riffa"], Kuwait: ["Kuwait City", "Ahmadi", "Salmiya", "Fahaheel"], Iraq: ["Baghdad", "Basra", "Najaf", "Erbil"], Yemen: ["Sanaa", "Aden", "Taiz"] };
