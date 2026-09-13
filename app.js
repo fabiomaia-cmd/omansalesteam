@@ -145,7 +145,7 @@ function fromDbRecord(record) {
 }
 async function loadRecords() {
   if (!supabaseClient) throw new Error("Supabase is not configured. Replace SUPABASE_URL and SUPABASE_KEY in app.js.");
-  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("*").order("date", { ascending: false });
+  const { data, error } = await supabaseClient.from(SUPABASE_TABLE).select("*").order("date", { ascending: false }).range(0, 9999);
   if (error) throw error;
   records = (data || []).map(fromDbRecord);
 }
